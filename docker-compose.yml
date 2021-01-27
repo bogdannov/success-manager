@@ -1,0 +1,83 @@
+version: '3.1'
+
+services:
+  nginx:
+    build: ./etc/nginx
+    restart: unless-stopped
+    volumes:
+      - ./src:/var/www/site/
+    ports:
+      - 80:80
+      - 443:443
+    working_dir: /var/www/site/
+    networks:
+      - laravel
+    links:
+      - app
+    depends_on:
+      - app
+  app:
+    build:
+      context: ./etc/app
+      args:
+        - USER_ID
+        - GROUP_ID
+    restart: unless-stopped
+    volumes:
+      - ./src:/var/www/site/
+    working_dir: /var/www/site
+    networks:
+      - laravel
+    depends_on:
+      - mysql
+      - redis
+    links:
+      - mysql
+  queue:
+    build: ./etc/queue
+    depends_on:
+      - app
+      - mysql
+      - redis
+    volumes:
+      - ./src:/var/www/site/
+    networks:
+      - laravel
+  scheduler:
+    build: ./etc/scheduler
+    restart: unless-stopped
+    depends_on:
+      - app
+      - mysql
+      - redis
+    volumes:
+      - ./src:/var/www/site/
+    networks:
+      - laravel
+  mysql:
+    image: percona:latest
+    restart: unless-stopped
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_ROOT_HOST: "%"
+    volumes:
+      - ./.data/mysql:/var/lib/mysql
+      - ./etc/mysql:/etc/my.cnf.d
+    user: "1000:1000"
+    networks:
+      - laravel
+  redis:
+    image: redis:4-alpine
+    restart: unless-stopped
+    volumes:
+      - ./.data/redis:/usr/share/redis/data
+    networks:
+      - laravel
+networks:
+  laravel:
+    driver: bridge

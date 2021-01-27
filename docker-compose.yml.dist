@@ -1,0 +1,118 @@
+version: '3.1'
+
+services:
+  nginx:
+    build: ./etc/nginx
+    restart: unless-stopped
+    volumes:
+      - ./src:/var/www/site/
+      - ./etc/certbot/conf:/etc/letsencrypt
+      - ./etc/certbot/www:/var/www/certbot
+    ports:
+      - 80:80
+      - 443:443
+    working_dir: /var/www/site/
+    networks:
+      - laravel
+    links:
+      - app
+    depends_on:
+      - app
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./etc/certbot/conf:/etc/letsencrypt
+      - ./etc/certbot/www:/var/www/certbot
+    networks:
+      - laravel
+  app:
+    build:
+        context: ./etc/app
+        args:
+          - USER_ID
+          - GROUP_ID
+    restart: unless-stopped
+    volumes:
+      - ./src:/var/www/site/
+    working_dir: /var/www/site
+    networks:
+      - laravel
+    depends_on:
+      - mysql
+      - redis
+    links:
+      - mysql
+  queue:
+    build: ./etc/queue
+    depends_on:
+      - app
+      - mysql
+      - redis
+    volumes:
+      - ./src:/var/www/site/
+    networks:
+      - laravel
+  websockets:
+    build: ./etc/websockets
+    restart: unless-stopped
+    depends_on:
+      - app
+      - mysql
+      - redis
+    volumes:
+      - ./src:/var/www/site/
+      - ./etc/certbot/conf:/etc/letsencrypt
+    ports:
+      - 6001:6001
+    networks:
+      - laravel
+  scheduler:
+    build: ./etc/scheduler
+    restart: unless-stopped
+    depends_on:
+      - app
+      - mysql
+      - redis
+    volumes:
+      - ./src:/var/www/site/
+    networks:
+      - laravel
+  mysql:
+    image: percona:latest
+    restart: unless-stopped
+    ports:
+    - 3306:3306
+    environment:
+      MYSQL_DATABASE: shwrm
+      MYSQL_USER: shwrm_user
+      MYSQL_PASSWORD: kbX93UEdWXzWJsLV
+      MYSQL_ROOT_PASSWORD: root_kbX93UEdWXzWJsLV
+      MYSQL_ROOT_HOST: "%"
+    volumes:
+      - ./.data/mysql:/var/lib/mysql
+      - ./etc/mysql:/etc/my.cnf.d
+    networks:
+      - laravel
+  clickhouse:
+      image: yandex/clickhouse-server:latest
+      restart: unless-stopped
+      environment:
+        CLICKHOUSE_USER: shwrm_user
+        CLICKHOUSE_PASSWORD: kbX93UEdWXzWJsLV
+      ports:
+        - "8123:8123"
+        - "9000:9000"
+      volumes:
+        - ./.data/clickhouse/data:/var/lib/clickhouse
+      networks:
+        - laravel
+  redis:
+    image: redis:4-alpine
+    restart: unless-stopped
+    volumes:
+      - ./.data/redis:/usr/share/redis/data
+    networks:
+      - laravel
+networks:
+  laravel:
+    driver: bridge

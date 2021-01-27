@@ -1,0 +1,10 @@
+[program:emails_job_worker]
+process_name=%(program_name)s_%(process_num)02d
+command=php /var/www/site/artisan queue:work --queue=emails --verbose --tries=3 --daemon
+autostart=true
+autorestart=true
+user=root
+numprocs=12
+redirect_stderr=true
+stderr_logfile=/var/www/site/storage/logs/emails-job-worker-err.log
+stdout_logfile=/var/www/site/storage/logs/emails-job-worker-out.log
